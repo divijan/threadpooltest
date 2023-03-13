@@ -1,0 +1,5 @@
+Why is my app IO bound when using 2 threads?
+0. H2 is a single-threaded DB: https://dba.stackexchange.com/questions/2918/about-single-threaded-versus-multithreaded-databases-performance
+
+threads blocking in calls to native methods appear in the JVM as RUNNABLE, and hence are reported by VisualVM as Running (and as consuming 100% CPU).
+

@@ -9,7 +9,7 @@ lazy val root = (project in file("."))
 
 libraryDependencies ++= Seq(
   "org.skinny-framework" %% "skinny-orm"      % "4.0.0",
-  //"org.scalikejdbc" %% "scalikejdbc"       % "4.0.0",
-  "com.h2database"       %  "h2"              % "1.4.200",
+  "org.postgresql"       % "postgresql"       % "42.5.4",
+
   "ch.qos.logback"       %  "logback-classic" % "1.2.3"
 )

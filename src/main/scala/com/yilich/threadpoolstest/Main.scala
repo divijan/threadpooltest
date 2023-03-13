@@ -5,7 +5,7 @@ import skinny.orm._
 import feature._
 
 import java.time.{Duration, Instant}
-import java.util.concurrent.{ExecutorService, Executors, TimeUnit}
+import java.util.concurrent.{ExecutorService, Executors, ForkJoinPool, TimeUnit}
 import scala.util.Random
 
 object Main extends App {
@@ -35,9 +35,7 @@ object Main extends App {
   }
 
 
-  //skinny.DBSettings.initialize()
-  Class.forName("org.h2.Driver")
-  ConnectionPool.singleton("jdbc:h2:file:./db/development;MODE=PostgreSQL;AUTO_SERVER=TRUE", "sa", "sa")
+  ConnectionPool.singleton("jdbc:postgresql://localhost:5432/postgres", "postgres", "postgres")
   implicit val session = AutoSession
   GlobalSettings.loggingSQLAndTime = LoggingSQLAndTimeSettings(
     enabled = true,
@@ -45,18 +43,18 @@ object Main extends App {
     logLevel = "info"
   )
 
-  def resetTest(): Unit = sql"DELETE FROM motorcycle_ad;".execute.apply()
+  def resetTest(): Unit = sql"DELETE FROM motorcycle.motorcycle_ad;".execute.apply()
   def heavyQuery(runNo: Int): Seq[Int] = DB localTx { implicit session =>
     val batchParams: Seq[Seq[Any]] = (1 to 1000).map { i =>
       val prKey = (runNo.toString + i.toString).toInt
-      Seq(prKey, "Fazer 600", 2004, 4000 + Random.between(-1000.0, 1000.0))
+      Seq(prKey, "Fazer 600", 2004, 4000 + Random.between(-1000, 1000))
     }
-    sql"INSERT INTO motorcycle_ad VALUES (?, ?, ?, ?)".batch(batchParams: _*).apply()
+    sql"INSERT INTO motorcycle.motorcycle_ad VALUES (?, ?, ?, ?)".batch(batchParams: _*).apply()
   }
 
   def runTest(threadPool: ExecutorService, poolType: String) = {
     val now = Instant.now()
-    for (i <- 1 to 1000) {
+    for (i <- 1 to 500) {
       threadPool.execute { () =>
         val threadName = Thread.currentThread().getName
         println(threadName + " started.") //todo: try different queries
@@ -74,9 +72,9 @@ object Main extends App {
 
   //TODO: Try to run a test involving independent rows and then updating the same rows
 
-  val threads = 2
-  val pool: ExecutorService = Executors.newFixedThreadPool(8)
+  val threads = 1
+  val pool: ExecutorService = ForkJoinPool.commonPool()
   resetTest()
-  runTest(pool, s"Fixed(2)")
+  runTest(pool, s"Fork-Join")
 
 }
