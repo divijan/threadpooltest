@@ -1,14 +1,19 @@
 package com.yilich.threadpoolstest
 
 import scalikejdbc._
-import skinny.orm._
-import feature._
 
 import java.time.{Duration, Instant}
 import java.util.concurrent.{ExecutorService, Executors, ForkJoinPool, ThreadPoolExecutor, TimeUnit}
 import scala.util.Random
 
 object Main extends App {
+  case class MotorcycleAd(id: Int, modelName: String, year: Int, price: Int)
+
+  object MotorcycleAd extends SQLSyntaxSupport[MotorcycleAd] {
+    override val tableName = "motorcycle.motorcycle_ad"
+    override val columns = Seq("id", "model_name", "year", "price")
+  }
+
   def initDb(implicit dbSession: DBSession): Unit = {
     sql"""
       CREATE TYPE motorcycle_purpose AS ENUM ('sport', 'off-road', 'naked', 'sport-tourer', 'adv');
@@ -43,22 +48,16 @@ object Main extends App {
     logLevel = "info"
   )
 
-  object MotorcycleAd extends SQLSyntaxSupport[MotorcycleAd] {
-    override val tableName = "motorcycle.motorcycle_ad"
-    override val columns = Seq("id", "model_name", "year", "price")
-  }
-  case class MotorcycleAd(id: Int, modelName: String, year: Int, price: Int)
-
   def resetTest(): Unit = sql"DELETE FROM motorcycle.motorcycle_ad;".execute.apply()
   def heavyQuery(runNo: Int): Unit = {
     val batchParams: Seq[Seq[Any]] = (1 to 1000).map { i =>
       val prKey = (runNo.toString + i.toString).toInt
       Seq(prKey, "Fazer 600", 2004, 4000 + Random.between(-1000, 1000))
     }
+
     withSQL {
       insert.into(MotorcycleAd).multipleValues(batchParams: _*)
     }.update.apply()
-    //sql"INSERT INTO motorcycle.motorcycle_ad VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING".batch(batchParams: _*).apply()
   }
 
   def runTest(threadPool: ExecutorService, poolType: String) = {
@@ -68,23 +67,22 @@ object Main extends App {
         val threadName = Thread.currentThread().getName
         println(threadName + " started.") //todo: try different queries
         heavyQuery(i)
-        //sql"SELECT * FROM motorcycle;".map(_.toMap).list.apply()
         resetTest()
         println(threadName + " ended.")
       }
     }
+
     threadPool.shutdown()
     threadPool.awaitTermination(2, TimeUnit.MINUTES)
+
     val duration = Duration.between(now, Instant.now()).toMillis / 1000.0
     println(s"$poolType thread pool took $duration seconds")
   }
 
-  //TODO: Try to run a test involving independent rows and then updating the same rows
+  //TODO: Try to run different tests involving independent rows and then updating the same rows
 
   val threads = 4
   val pool: ExecutorService = Executors.newFixedThreadPool(threads)//ForkJoinPool.commonPool()
   resetTest()
   runTest(pool, s"Fixed($threads)")
-
-
 }
