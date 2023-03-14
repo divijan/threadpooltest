@@ -5,7 +5,7 @@ import skinny.orm._
 import feature._
 
 import java.time.{Duration, Instant}
-import java.util.concurrent.{ExecutorService, Executors, ForkJoinPool, TimeUnit}
+import java.util.concurrent.{ExecutorService, Executors, ForkJoinPool, ThreadPoolExecutor, TimeUnit}
 import scala.util.Random
 
 object Main extends App {
@@ -43,13 +43,22 @@ object Main extends App {
     logLevel = "info"
   )
 
+  object MotorcycleAd extends SQLSyntaxSupport[MotorcycleAd] {
+    override val tableName = "motorcycle.motorcycle_ad"
+    override val columns = Seq("id", "model_name", "year", "price")
+  }
+  case class MotorcycleAd(id: Int, modelName: String, year: Int, price: Int)
+
   def resetTest(): Unit = sql"DELETE FROM motorcycle.motorcycle_ad;".execute.apply()
-  def heavyQuery(runNo: Int): Seq[Int] = DB localTx { implicit session =>
+  def heavyQuery(runNo: Int): Unit = {
     val batchParams: Seq[Seq[Any]] = (1 to 1000).map { i =>
       val prKey = (runNo.toString + i.toString).toInt
       Seq(prKey, "Fazer 600", 2004, 4000 + Random.between(-1000, 1000))
     }
-    sql"INSERT INTO motorcycle.motorcycle_ad VALUES (?, ?, ?, ?)".batch(batchParams: _*).apply()
+    withSQL {
+      insert.into(MotorcycleAd).multipleValues(batchParams: _*)
+    }.update.apply()
+    //sql"INSERT INTO motorcycle.motorcycle_ad VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING".batch(batchParams: _*).apply()
   }
 
   def runTest(threadPool: ExecutorService, poolType: String) = {
@@ -72,9 +81,10 @@ object Main extends App {
 
   //TODO: Try to run a test involving independent rows and then updating the same rows
 
-  val threads = 1
-  val pool: ExecutorService = ForkJoinPool.commonPool()
+  val threads = 4
+  val pool: ExecutorService = Executors.newFixedThreadPool(threads)//ForkJoinPool.commonPool()
   resetTest()
-  runTest(pool, s"Fork-Join")
+  runTest(pool, s"Fixed($threads)")
+
 
 }

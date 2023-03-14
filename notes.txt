@@ -1,0 +1,14 @@
+Why is my app IO bound when using 2 threads?
+0. H2 is a single-threaded DB: https://dba.stackexchange.com/questions/2918/about-single-threaded-versus-multithreaded-databases-performance
+
+threads blocking in calls to native methods appear in the JVM as RUNNABLE, and hence are reported by
+VisualVM as Running (and as consuming 100% CPU).
+Batch sql just makes a lot of INSERTS inside a single transaction. Insert.multipleValues actually
+makes one INSERT statement with 1000 rows. This is about twice as slow as a lot of individual inserts. However,
+with this approach:
+Fixed(2)   20.28    19.098
+Fixed(4)   12.795   12.04
+Fixed(8)   9.566
+Fixed(16)  10.576   9.922
+Cached     10.954 and exhausted a connection pool: Cannot get a connection, pool error Timeout waiting for idle object
+ForkJoin   9.469    9.397
